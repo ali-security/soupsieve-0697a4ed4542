@@ -1,5 +1,6 @@
 """Test language selectors."""
 from .. import util
+import soupsieve as sv
 
 
 class TestLang(util.TestCase):
@@ -132,6 +133,41 @@ class TestLang(util.TestCase):
             ['1', '2', '3', '4', '5', '6'],
             flags=util.HTML
         )
+
+    def test_language_unclosed_quote(self):
+        """Test language with an unclosed quoted value fails for syntax error, not timeout error."""
+
+        import platform
+
+        patterns = (
+            'p:lang("' + ('x' * 300),
+            "p:lang('" + ('x' * 300),
+            'p:lang(de, "' + ('x' * 300)
+        )
+
+        for pattern in patterns:
+            if platform.system() == 'Windows':
+                with self.assertRaises(sv.SelectorSyntaxError):
+                    sv.compile(pattern)
+            else:
+                import signal
+
+                def timeout_handler(signum, frame):
+                    raise TimeoutError
+
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(3)
+
+                passed = False
+                try:
+                    with self.assertRaises(sv.SelectorSyntaxError):
+                        sv.compile(pattern)
+                    passed = True
+                except TimeoutError:
+                    pass
+                finally:
+                    signal.alarm(0)
+                self.assertTrue(passed)
 
     def test_wildcard_at_start_quoted(self):
         """Test language with wildcard at start (quoted)."""
